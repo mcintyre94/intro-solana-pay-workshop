@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import BackLink from "../components/BackLink";
 import Loading from "../components/Loading";
 import { MakeTransactionInputData, MakeTransactionOutputData } from "./api/makeTransaction";
+import { makeSearchParams } from "../lib/searchParams";
 
 export default function Checkout() {
   const router = useRouter();
@@ -16,23 +17,6 @@ export default function Checkout() {
   // State to hold API response fields
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  // Read the URL query (which includes our chosen products)
-  function makeSearchParams() {
-    const searchParams = new URLSearchParams();
-    for (const [key, value] of Object.entries(router.query)) {
-      if (value) {
-        if (Array.isArray(value)) {
-          for (const v of value) {
-            searchParams.append(key, v);
-          }
-        } else {
-          searchParams.append(key, value);
-        }
-      }
-    }
-    return searchParams
-  }
 
   // Generate the unique reference which will be used for this transaction
   const reference = useMemo(() => Keypair.generate().publicKey, []);
@@ -47,7 +31,7 @@ export default function Checkout() {
       account: publicKey.toString(),
     }
 
-    const searchParams = makeSearchParams()
+    const searchParams = makeSearchParams(router.query)
 
     // Add reference to the params we'll pass to the API
     searchParams.append('reference', reference.toString());

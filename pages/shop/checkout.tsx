@@ -1,4 +1,4 @@
-import { createQR, encodeURL, findReference, FindReferenceError, TransferRequestURLFields, validateTransfer, ValidateTransferError } from "@solana/pay";
+import { createQR, encodeURL, TransferRequestURLFields, findReference, validateTransfer, FindReferenceError, ValidateTransferError, TransactionRequestURLFields } from "@solana/pay";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { clusterApiUrl, Connection, Keypair } from "@solana/web3.js";
 import { useRouter } from "next/router";
@@ -7,6 +7,7 @@ import BackLink from "../../components/BackLink";
 import PageHeading from "../../components/PageHeading";
 import { shopAddress, usdcAddress } from "../../lib/addresses";
 import calculatePrice from "../../lib/calculatePrice";
+import { makeSearchParams } from "../../lib/searchParams";
 
 export default function Checkout() {
   const router = useRouter()
@@ -24,22 +25,18 @@ export default function Checkout() {
   const endpoint = clusterApiUrl(network)
   const connection = new Connection(endpoint)
 
-  // Solana Pay transfer params
-  const urlParams: TransferRequestURLFields = {
-    recipient: shopAddress,
-    splToken: usdcAddress,
-    amount,
-    reference,
-    label: "Cookies Inc",
-    message: "Thanks for your order! 🍪",
-  }
-
-  // Encode the params into the format shown
-  const url = encodeURL(urlParams)
-
   // Show the QR code
   useEffect(() => {
-    const qr = createQR(url, 512, 'transparent')
+    // window.location is only available in the browser, so create the URL in here
+    const { location } = window
+    const searchParams = makeSearchParams(router.query)
+    searchParams.append('reference', reference.toBase58())
+    const apiUrl = `${location.protocol}//${location.host}/api/makeTransaction?${searchParams.toString()}`
+    const urlParams: TransactionRequestURLFields = {
+      link: new URL(apiUrl),
+    }
+    const solanaUrl = encodeURL(urlParams)
+    const qr = createQR(solanaUrl, 512, 'transparent')
     if (qrRef.current && amount.isGreaterThan(0)) {
       qrRef.current.innerHTML = ''
       qr.append(qrRef.current)
@@ -51,9 +48,7 @@ export default function Checkout() {
     const interval = setInterval(async () => {
       try {
         // Check if there is any transaction for the reference
-        console.log('reference is', reference.toBase58())
         const signatureInfo = await findReference(connection, reference, { finality: 'confirmed' })
-        console.log('Found transaction', signatureInfo.signature);
         // Validate that the transaction has the expected recipient, amount and SPL token
         await validateTransfer(
           connection,
@@ -67,7 +62,6 @@ export default function Checkout() {
           { commitment: 'confirmed' }
         )
         router.push('/shop/confirmed')
-        clearInterval(interval)
       } catch (e) {
         if (e instanceof FindReferenceError) {
           // No transaction found yet, ignore this error
@@ -84,7 +78,7 @@ export default function Checkout() {
     return () => {
       clearInterval(interval)
     }
-  }, [amount])
+  }, [])
 
   if (amount.isZero()) {
     return (
