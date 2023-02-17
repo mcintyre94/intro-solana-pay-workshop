@@ -18,34 +18,39 @@ export default function Checkout() {
   const [message, setMessage] = useState<string | null>(null);
 
   // Read the URL query (which includes our chosen products)
-  const searchParams = new URLSearchParams();
-  for (const [key, value] of Object.entries(router.query)) {
-    if (value) {
-      if (Array.isArray(value)) {
-        for (const v of value) {
-          searchParams.append(key, v);
+  function makeSearchParams() {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(router.query)) {
+      if (value) {
+        if (Array.isArray(value)) {
+          for (const v of value) {
+            searchParams.append(key, v);
+          }
+        } else {
+          searchParams.append(key, value);
         }
-      } else {
-        searchParams.append(key, value);
       }
     }
+    return searchParams
   }
 
   // Generate the unique reference which will be used for this transaction
   const reference = useMemo(() => Keypair.generate().publicKey, []);
 
-  // Add it to the params we'll pass to the API
-  searchParams.append('reference', reference.toString());
-
   // Use our API to fetch the transaction for the selected items
   async function getTransaction() {
-    if (!publicKey) {
+    if (!publicKey || Object.keys(router.query).length === 0) {
       return;
     }
 
     const body: MakeTransactionInputData = {
       account: publicKey.toString(),
     }
+
+    const searchParams = makeSearchParams()
+
+    // Add reference to the params we'll pass to the API
+    searchParams.append('reference', reference.toString());
 
     const response = await fetch(`/api/makeTransaction?${searchParams.toString()}`, {
       method: 'POST',
@@ -71,7 +76,7 @@ export default function Checkout() {
 
   useEffect(() => {
     getTransaction()
-  }, [publicKey])
+  }, [publicKey, router.query])
 
   // Send the fetched transaction to the connected wallet
   async function trySendTransaction() {
