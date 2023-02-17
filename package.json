@@ -7,6 +7,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@solana/pay": "^0.2.4",
     "@solana/wallet-adapter-base": "^0.9.20",
     "@solana/wallet-adapter-react": "^0.15.28",
     "@solana/wallet-adapter-react-ui": "^0.9.27",
@@ -16,7 +17,9 @@
     "bignumber.js": "^9.0.2",
     "next": "latest",
     "react": "^17.0.2",
-    "react-dom": "^17.0.2"
+    "react-circular-progressbar": "^2.1.0",
+    "react-dom": "^17.0.2",
+    "react-dom-confetti": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "17.0.4",
