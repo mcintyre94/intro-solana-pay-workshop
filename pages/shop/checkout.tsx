@@ -49,18 +49,6 @@ export default function Checkout() {
       try {
         // Check if there is any transaction for the reference
         const signatureInfo = await findReference(connection, reference, { finality: 'confirmed' })
-        // Validate that the transaction has the expected recipient, amount and SPL token
-        await validateTransfer(
-          connection,
-          signatureInfo.signature,
-          {
-            recipient: shopAddress,
-            amount,
-            splToken: usdcAddress,
-            reference,
-          },
-          { commitment: 'confirmed' }
-        )
         router.push('/shop/confirmed')
       } catch (e) {
         if (e instanceof FindReferenceError) {

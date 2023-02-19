@@ -1,4 +1,5 @@
 import {
+  createBurnCheckedInstruction,
   createMintToCheckedInstruction,
   createTransferCheckedInstruction,
   getAssociatedTokenAddress,
@@ -87,12 +88,14 @@ async function post(
 
     // Get the buyer and seller coupon token accounts
     // Buyer one may not exist, so we create it (which costs SOL) as the shop account if it doesn't
-    const buyerCouponAddress = await getOrCreateAssociatedTokenAccount(
+    const buyerCouponAccount = await getOrCreateAssociatedTokenAccount(
       connection,
       shopKeypair, // shop pays the fee to create it
       couponAddress, // which token the account is for
       buyerPublicKey // who the token account belongs to (the buyer)
-    ).then((account) => account.address)
+    )
+
+    const buyerGetsCouponDiscount = buyerCouponAccount.amount >= 5
 
     // Get details about the USDC token
     const usdcMint = await getMint(connection, usdcAddress)
@@ -118,13 +121,15 @@ async function post(
       feePayer: buyerPublicKey,
     })
 
+    const amountToPay = buyerGetsCouponDiscount ? amount.dividedBy(2) : amount
+
     // Create the instruction to send USDC from the buyer to the shop
     const transferInstruction = createTransferCheckedInstruction(
       buyerUsdcAddress, // source
       usdcAddress, // mint (token address)
       shopUsdcAddress, // destination
       buyerPublicKey, // owner of source address
-      amount.toNumber() * 10 ** usdcMint.decimals, // amount to transfer (in units of the USDC token)
+      amountToPay.toNumber() * 10 ** usdcMint.decimals, // amount to transfer (in units of the USDC token)
       usdcMint.decimals // decimals of the USDC token
     )
 
@@ -138,13 +143,32 @@ async function post(
 
     // Create the instruction to send the coupon from the shop to the buyer
 
-    const couponInstruction = createMintToCheckedInstruction(
-      couponAddress, // the token we're minting
-      buyerCouponAddress, // who we're minting to
-      shopPublicKey, // the authority,
-      1, // number to mint
-      0 // decimals of the token
-    )
+    const couponInstruction = buyerGetsCouponDiscount
+      ? // the coupon instruction is to burn 5 coupons
+        createBurnCheckedInstruction(
+          buyerCouponAccount.address, // token account
+          couponAddress, // token mint
+          buyerPublicKey, // owner
+          5, // amount
+          0 // decimals
+        )
+      : createMintToCheckedInstruction(
+          couponAddress, // the token we're minting
+          buyerCouponAccount.address, // who we're minting to
+          shopPublicKey, // the authority,
+          1, // number to mint
+          0 // decimals of the token
+        )
+
+    // Add the shop as a signer to the coupon instruction
+    // If the shop is minting a coupon, it already will be a signer
+    // But if the buyer is burning the coupons, the shop won't be a signer automatically
+    // It's useful security to have the shop sign the transaction
+    couponInstruction.keys.push({
+      pubkey: shopPublicKey,
+      isSigner: true,
+      isWritable: false,
+    })
 
     // Add the instruction to the transaction
     transaction.add(transferInstruction, couponInstruction)
@@ -162,10 +186,14 @@ async function post(
 
     // Insert into database: reference, amount
 
+    const message = buyerGetsCouponDiscount
+      ? '50% Discount! 🍪'
+      : 'Thanks for your order! 🍪'
+
     // Return the serialized transaction
     res.status(200).json({
       transaction: base64,
-      message: 'Thanks for your order! 🍪',
+      message,
       // required for Glow
       network: 'devnet',
     })
