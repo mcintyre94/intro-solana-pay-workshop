@@ -9,3 +9,8 @@ export const shopAddress = new PublicKey(
 export const usdcAddress = new PublicKey(
   '4HZCNvobxtDA3uezTGmDAEqVLp7oo73UrnbxNeUMszd4'
 )
+
+// This is your token/coupon address
+export const couponAddress = new PublicKey(
+  '6ECroWv425bgRZWj1wnMuFLhvvYRBseykKPaK3LH5exc'
+)
